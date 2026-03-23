@@ -30,6 +30,31 @@ class ProductViewSet(viewsets.ModelViewSet):
             raise permissions.PermissionDenied("You can only delete your own products.")
         instance.delete()
 
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Farmer-specific statistics"""
+        if request.user.role != User.Role.FARMER:
+             return Response({"error": "Only farmers can view these stats."}, status=403)
+        
+        user = request.user
+        total_products = Product.objects.filter(farmer=user).count()
+        total_quantity = sum(p.quantity_available for p in Product.objects.filter(farmer=user))
+        
+        farmer_orders = Order.objects.filter(product__farmer=user)
+        total_orders = farmer_orders.count()
+        pending_orders = farmer_orders.filter(status='PENDING').count()
+        completed_orders = farmer_orders.filter(status='DELIVERED').count()
+        total_revenue = sum(o.total_price for o in farmer_orders.filter(status='DELIVERED'))
+        
+        return Response({
+            "total_products": total_products,
+            "total_quantity": total_quantity,
+            "total_orders": total_orders,
+            "pending_orders": pending_orders,
+            "completed_orders": completed_orders,
+            "total_revenue": total_revenue
+        })
+
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer

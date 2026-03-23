@@ -12,6 +12,8 @@ class ProductSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
     buyer_name = serializers.CharField(source='buyer.username', read_only=True)
+    delivery_status = serializers.CharField(source='delivery.status', read_only=True)
+    transporter_name = serializers.CharField(source='delivery.transporter.username', read_only=True)
 
     class Meta:
         model = Order

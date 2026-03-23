@@ -10,6 +10,15 @@ const Sidebar = ({ user, activeTab, setActiveTab, logoutUser }) => {
     { key: "profile", label: "Profile", icon: <Sprout size={18} /> },
   ];
 
+  const farmerItems = [
+    { key: "dashboard", label: "Dashboard", icon: <Home size={18} /> },
+    { key: "products", label: "My Products", icon: <Package size={18} /> },
+    { key: "orders", label: "My Orders", icon: <ShoppingCart size={18} /> },
+    { key: "tracking", label: "Track Delivery", icon: <Truck size={18} /> },
+    { key: "prices", label: "Official Prices", icon: <Package size={18} /> },
+    { key: "complaints", label: "Complaints", icon: <LogOut size={18} /> },
+  ];
+
   const genericItems = [
     { key: "dashboard", label: "Dashboard", icon: <Home size={18} /> },
     {
@@ -18,11 +27,12 @@ const Sidebar = ({ user, activeTab, setActiveTab, logoutUser }) => {
       icon: <Package size={18} />,
     },
     { key: "orders", label: "My Orders", icon: <ShoppingCart size={18} /> },
-    { key: "tracking", label: "Track Order", icon: <Truck size={18} /> },
     { key: "services", label: "Services", icon: <Sprout size={18} /> },
   ];
 
-  const menuItems = user?.role === "TRANSPORTER" ? transporterItems : genericItems;
+  let menuItems = genericItems;
+  if (user?.role === "TRANSPORTER") menuItems = transporterItems;
+  if (user?.role === "FARMER") menuItems = farmerItems;
 
   return (
     <aside className="dashboard-sidebar">
