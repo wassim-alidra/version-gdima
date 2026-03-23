@@ -22,7 +22,7 @@ const Dashboard = () => {
                 <BuyerDashboard activeTab={activeTab} />
             )}
 
-            {user.role === "TRANSPORTER" && activeTab !== "tracking" && (
+            {user.role === "TRANSPORTER" && (
                 <TransporterDashboard activeTab={activeTab} />
             )}
 

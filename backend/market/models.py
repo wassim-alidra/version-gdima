@@ -43,7 +43,26 @@ class Delivery(models.Model):
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='delivery')
     pickup_date = models.DateTimeField(null=True, blank=True)
     delivery_date = models.DateTimeField(null=True, blank=True)
-    status = models.CharField(max_length=20, default='ASSIGNED') # Could reuse Order status logic or separate
+    status = models.CharField(max_length=20, default='ASSIGNED') 
+    delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    def save(self, *args, **kwargs):
+        # Default fee is 10% of order total, min 5.00
+        if not self.delivery_fee and self.order:
+            self.delivery_fee = max(Decimal('5.00'), self.order.total_price * Decimal('0.10'))
+        
+        # Sync status with Order
+        if self.status == 'IN_TRANSIT':
+            self.order.status = Order.Status.IN_TRANSIT
+            self.order.save()
+        elif self.status == 'DELIVERED':
+            self.order.status = Order.Status.DELIVERED
+            self.order.save()
+            if not self.delivery_date:
+                from django.utils import timezone
+                self.delivery_date = timezone.now()
+        
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Delivery for Order #{self.order.id}"

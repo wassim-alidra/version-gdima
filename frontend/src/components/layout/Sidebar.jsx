@@ -1,7 +1,16 @@
-import { Home, Package, ShoppingCart, Truck, Sprout, LogOut } from "lucide-react";
+import { Home, Package, ShoppingCart, Truck, Sprout, LogOut, Clock } from "lucide-react";
 
 const Sidebar = ({ user, activeTab, setActiveTab, logoutUser }) => {
-  const menuItems = [
+  const transporterItems = [
+    { key: "dashboard", label: "Dashboard", icon: <Home size={18} /> },
+    { key: "requests", label: "Delivery Requests", icon: <Package size={18} /> },
+    { key: "status", label: "Update Status", icon: <Truck size={18} /> },
+    { key: "history", label: "Delivery History", icon: <Clock size={18} /> },
+    { key: "earnings", label: "Earnings", icon: <ShoppingCart size={18} /> },
+    { key: "profile", label: "Profile", icon: <Sprout size={18} /> },
+  ];
+
+  const genericItems = [
     { key: "dashboard", label: "Dashboard", icon: <Home size={18} /> },
     {
       key: "products",
@@ -12,6 +21,8 @@ const Sidebar = ({ user, activeTab, setActiveTab, logoutUser }) => {
     { key: "tracking", label: "Track Order", icon: <Truck size={18} /> },
     { key: "services", label: "Services", icon: <Sprout size={18} /> },
   ];
+
+  const menuItems = user?.role === "TRANSPORTER" ? transporterItems : genericItems;
 
   return (
     <aside className="dashboard-sidebar">

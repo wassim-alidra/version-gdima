@@ -76,9 +76,15 @@ class DeliveryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        queryset = Delivery.objects.all()
         if user.role == User.Role.TRANSPORTER:
-            return Delivery.objects.filter(transporter=user)
-        return Delivery.objects.all()
+            queryset = queryset.filter(transporter=user)
+        
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+            
+        return queryset
 
     def perform_create(self, serializer):
          if self.request.user.role != User.Role.TRANSPORTER:
@@ -88,8 +94,21 @@ class DeliveryViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def available_orders(self, request):
         """List orders ready for delivery assignment"""
-        # Logic to find orders needing delivery
-        # Assuming pending orders need delivery (simplified) or separate status
         orders = Order.objects.filter(status='ACCEPTED', delivery__isnull=True)
         serializer = OrderSerializer(orders, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def earnings(self, request):
+        """Calculate total earnings for the transporter"""
+        if request.user.role != User.Role.TRANSPORTER:
+            return Response({"error": "Only transporters can view earnings."}, status=403)
+        
+        completed_deliveries = Delivery.objects.filter(transporter=request.user, status='DELIVERED')
+        total_earnings = sum(d.delivery_fee for d in completed_deliveries)
+        
+        return Response({
+            "total_earnings": total_earnings,
+            "completed_count": completed_deliveries.count(),
+            "history": DeliverySerializer(completed_deliveries, many=True).data
+        })

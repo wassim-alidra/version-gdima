@@ -1,16 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import api from "../../api/axios";
-import { Truck, ClipboardList, Clock, CheckCircle } from "lucide-react";
+import { Truck, ClipboardList, Clock, CheckCircle, DollarSign, User as UserIcon, Save, Package } from "lucide-react";
+import AuthContext from "../../context/AuthContext";
 import "../../styles/dashboard.css";
 
 const TransporterDashboard = ({ activeTab }) => {
+    const { user, setUser } = useContext(AuthContext);
     const [availableOrders, setAvailableOrders] = useState([]);
     const [myDeliveries, setMyDeliveries] = useState([]);
+    const [earningsData, setEarningsData] = useState({ total_earnings: 0, completed_count: 0, history: [] });
+    const [profileForm, setProfileForm] = useState({
+        vehicle_type: "",
+        license_plate: "",
+        capacity: 0
+    });
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        fetchAvailableOrders();
-        fetchMyDeliveries();
-    }, []);
+        if (activeTab === "dashboard" || activeTab === "requests") fetchAvailableOrders();
+        if (activeTab === "dashboard" || activeTab === "status") fetchMyDeliveries();
+        if (activeTab === "history") fetchMyDeliveries("DELIVERED");
+        if (activeTab === "earnings") fetchEarnings();
+        if (activeTab === "profile") {
+            setProfileForm({
+                vehicle_type: user.profile?.vehicle_type || "",
+                license_plate: user.profile?.license_plate || "",
+                capacity: user.profile?.capacity || 0
+            });
+        }
+    }, [activeTab]);
 
     const fetchAvailableOrders = async () => {
         try {
@@ -21,121 +39,105 @@ const TransporterDashboard = ({ activeTab }) => {
         }
     };
 
-    const fetchMyDeliveries = async () => {
+    const fetchMyDeliveries = async (statusFilter = null) => {
         try {
-            const res = await api.get("market/deliveries/");
+            let url = "market/deliveries/";
+            if (statusFilter) url += `?status=${statusFilter}`;
+            const res = await api.get(url);
             setMyDeliveries(res.data);
         } catch (err) {
             console.error("Error fetching deliveries:", err);
         }
     };
 
-    const handleAccept = async (orderId) => {
+    const fetchEarnings = async () => {
         try {
-            await api.post("market/deliveries/", {
-                order: orderId,
-            });
-            alert("Delivery accepted!");
-            fetchAvailableOrders();
-            fetchMyDeliveries();
+            const res = await api.get("market/deliveries/earnings/");
+            setEarningsData(res.data);
         } catch (err) {
-            alert("Error accepting delivery");
-            console.error(err);
+            console.error("Error fetching earnings:", err);
         }
     };
 
-    const handleUpdateDeliveryStatus = async (deliveryId, status) => {
+    const handleAccept = async (orderId) => {
+        try {
+            await api.post("market/deliveries/", { order: orderId });
+            alert("Delivery accepted!");
+            fetchAvailableOrders();
+        } catch (err) {
+            alert("Error accepting delivery");
+        }
+    };
+
+    const handleUpdateStatus = async (deliveryId, status) => {
         try {
             await api.patch(`market/deliveries/${deliveryId}/`, { status });
             fetchMyDeliveries();
+            if (status === 'DELIVERED') fetchEarnings(); // Refresh earnings if something was delivered
         } catch (err) {
-            alert("Error updating delivery status");
-            console.error(err);
+            alert("Error updating status");
         }
     };
 
-    const totalAvailable = availableOrders.length;
-    const totalDeliveries = myDeliveries.length;
-    const inTransitCount = myDeliveries.filter(
-        (d) => d.status === "IN_TRANSIT"
-    ).length;
-    const deliveredCount = myDeliveries.filter(
-        (d) => d.status === "DELIVERED"
-    ).length;
+    const handleProfileUpdate = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const res = await api.patch("users/me/", profileForm);
+            setUser({
+                ...user,
+                profile: {
+                    ...user.profile,
+                    ...res.data
+                }
+            });
+            alert("Profile updated successfully!");
+        } catch (err) {
+            alert("Error updating profile");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     if (activeTab === "dashboard") {
+        const stats = [
+            { label: "Available", value: availableOrders.length, icon: <ClipboardList />, color: "blue" },
+            { label: "Active", value: myDeliveries.filter(d => d.status !== 'DELIVERED').length, icon: <Truck />, color: "green" },
+            { label: "Completed", value: myDeliveries.filter(d => d.status === 'DELIVERED').length, icon: <CheckCircle />, color: "purple" },
+            { label: "Earnings", value: `$${earningsData.total_earnings || 0}`, icon: <DollarSign />, color: "yellow" }
+        ];
+
         return (
-            <div className="buyer-dashboard">
-                <div className="stats">
-                    <div className="stat-card stat-card-clean">
-                        <div className="stat-card-top">
-                            <span>Available Missions</span>
-                            <ClipboardList size={18} />
+            <div className="transporter-home">
+                <div className="stats-grid">
+                    {stats.map((s, i) => (
+                        <div key={i} className={`stat-card stat-${s.color}`}>
+                            <div className="stat-icon">{s.icon}</div>
+                            <div className="stat-info">
+                                <h3>{s.value}</h3>
+                                <p>{s.label}</p>
+                            </div>
                         </div>
-                        <h3>{totalAvailable}</h3>
-                    </div>
-
-                    <div className="stat-card stat-card-clean">
-                        <div className="stat-card-top">
-                            <span>My Deliveries</span>
-                            <Truck size={18} />
-                        </div>
-                        <h3>{totalDeliveries}</h3>
-                    </div>
-
-                    <div className="stat-card stat-card-clean">
-                        <div className="stat-card-top">
-                            <span>In Transit</span>
-                            <Clock size={18} />
-                        </div>
-                        <h3>{inTransitCount}</h3>
-                    </div>
-
-                    <div className="stat-card stat-card-clean">
-                        <div className="stat-card-top">
-                            <span>Delivered</span>
-                            <CheckCircle size={18} />
-                        </div>
-                        <h3>{deliveredCount}</h3>
-                    </div>
+                    ))}
                 </div>
 
-                <div className="content-grid buyer-home-grid">
+                <div className="dashboard-sections">
                     <div className="glass-panel">
-                        <div className="section-header">
-                            <h3>Available for Delivery</h3>
-                            <p>Orders waiting for a transporter</p>
+                        <div className="panel-header">
+                            <h3>Ready for Pickup</h3>
+                            <button className="text-btn" onClick={() => fetchAvailableOrders()}>Refresh</button>
                         </div>
-
                         {availableOrders.length === 0 ? (
-                            <p className="empty-state">No orders needing delivery.</p>
+                            <p className="empty-text">No delivery requests available.</p>
                         ) : (
-                            <div className="order-list-modern">
-                                {availableOrders.slice(0, 5).map((o) => (
-                                    <div key={o.id} className="order-card-modern">
-                                        <div className="order-card-top">
-                                            <div>
-                                                <h4>Order #{o.id}</h4>
-                                                <p>{o.product_name}</p>
-                                            </div>
+                            <div className="mini-list">
+                                {availableOrders.slice(0, 3).map(o => (
+                                    <div key={o.id} className="mini-item">
+                                        <div className="item-main">
+                                            <strong>Order #{o.id}</strong>
+                                            <span>{o.product_name}</span>
                                         </div>
-
-                                        <div className="delivery-route">
-                                            <span>From: {o.product_location || "Farm"}</span>
-                                            <span>To: {o.buyer_location || "Buyer"}</span>
-                                        </div>
-
-                                        <div className="order-card-bottom">
-                                            <span>{o.quantity}kg</span>
-                                            <span className="mini-badge">Ready</span>
-                                        </div>
-
-                                        <button
-                                            className="btn-primary modern-btn"
-                                            onClick={() => handleAccept(o.id)}
-                                        >
-                                            Accept Delivery
-                                        </button>
+                                        <button className="btn-sm" onClick={() => handleAccept(o.id)}>Accept</button>
                                     </div>
                                 ))}
                             </div>
@@ -143,37 +145,20 @@ const TransporterDashboard = ({ activeTab }) => {
                     </div>
 
                     <div className="glass-panel">
-                        <div className="section-header">
-                            <h3>Recent Deliveries</h3>
-                            <p>Your latest assigned missions</p>
+                        <div className="panel-header">
+                            <h3>Active Deliveries</h3>
                         </div>
-
-                        {myDeliveries.length === 0 ? (
-                            <p className="empty-state">No active deliveries.</p>
+                        {myDeliveries.filter(d => d.status !== 'DELIVERED').length === 0 ? (
+                            <p className="empty-text">No active missions.</p>
                         ) : (
-                            <div className="order-list-modern">
-                                {myDeliveries.slice(0, 5).map((d) => (
-                                    <div key={d.id} className="order-card-modern">
-                                        <div className="order-card-top">
-                                            <div>
-                                                <h4>Delivery #{d.id}</h4>
-                                                <p>For Order #{d.order}</p>
-                                            </div>
+                            <div className="mini-list">
+                                {myDeliveries.filter(d => d.status !== 'DELIVERED').slice(0, 3).map(d => (
+                                    <div key={d.id} className="mini-item">
+                                        <div className="item-main">
+                                            <strong>Delivery #{d.id}</strong>
+                                            <span className={`status-pill ${d.status.toLowerCase()}`}>{d.status}</span>
                                         </div>
-
-                                        <div className="order-card-bottom">
-                                            <span>Status</span>
-                                            <span
-                                                className={`badge badge-${d.status === "DELIVERED"
-                                                        ? "delivered"
-                                                        : d.status === "IN_TRANSIT"
-                                                            ? "accepted"
-                                                            : "pending"
-                                                    }`}
-                                            >
-                                                {d.status}
-                                            </span>
-                                        </div>
+                                        <Truck size={16} color="#6b7280" />
                                     </div>
                                 ))}
                             </div>
@@ -184,125 +169,198 @@ const TransporterDashboard = ({ activeTab }) => {
         );
     }
 
-    if (activeTab === "orders") {
+    if (activeTab === "requests") {
         return (
             <div className="glass-panel">
                 <div className="section-header">
-                    <h3>Available Delivery Orders</h3>
-                    <p>Accept a new mission</p>
+                    <h2>Available Delivery Requests</h2>
+                    <p>Missions waiting for a transporter</p>
                 </div>
-
-                {availableOrders.length === 0 ? (
-                    <p className="empty-state">No orders needing delivery.</p>
-                ) : (
-                    <div className="order-list-modern">
-                        {availableOrders.map((o) => (
-                            <div key={o.id} className="order-card-modern">
-                                <div className="order-card-top">
-                                    <div>
-                                        <h4>Order #{o.id}</h4>
-                                        <p>{o.product_name}</p>
+                <div className="grid-list">
+                    {availableOrders.map(o => (
+                        <div key={o.id} className="card-item animate-in">
+                            <div className="card-badge">Available</div>
+                            <div className="card-content">
+                                <h3>Order #{o.id}</h3>
+                                <div className="detail-row">
+                                    <Package size={16} />
+                                    <span>{o.product_name} ({o.quantity}kg)</span>
+                                </div>
+                                <div className="route-flow">
+                                    <div className="node">
+                                        <div className="dot green"></div>
+                                        <span>Pickup</span>
+                                    </div>
+                                    <div className="line"></div>
+                                    <div className="node">
+                                        <div className="dot blue"></div>
+                                        <span>Destination</span>
                                     </div>
                                 </div>
-
-                                <div className="delivery-route">
-                                    <span>From: {o.product_location || "Farm"}</span>
-                                    <span>To: {o.buyer_location || "Buyer"}</span>
-                                </div>
-
-                                <div className="order-card-bottom">
-                                    <span>{o.quantity}kg</span>
-                                    <span className="mini-badge">Available</span>
-                                </div>
-
-                                <button
-                                    className="btn-primary modern-btn"
-                                    onClick={() => handleAccept(o.id)}
-                                >
-                                    Accept Delivery
-                                </button>
                             </div>
-                        ))}
-                    </div>
-                )}
+                            <button className="btn-primary full-width" onClick={() => handleAccept(o.id)}>
+                                Accept Mission
+                            </button>
+                        </div>
+                    ))}
+                    {availableOrders.length === 0 && <p className="empty-state">No requests available at the moment.</p>}
+                </div>
             </div>
         );
     }
 
-    if (activeTab === "tracking") {
+    if (activeTab === "status") {
+        const active = myDeliveries.filter(d => d.status !== 'DELIVERED');
         return (
             <div className="glass-panel">
                 <div className="section-header">
-                    <h3>My Deliveries</h3>
-                    <p>Update delivery progress</p>
+                    <h2>Update Delivery Status</h2>
+                    <p>Manage your active missions</p>
                 </div>
-
-                {myDeliveries.length === 0 ? (
-                    <p className="empty-state">No active deliveries.</p>
-                ) : (
-                    <div className="order-list-modern">
-                        {myDeliveries.map((d) => (
-                            <div key={d.id} className="order-card-modern">
-                                <div className="order-card-top">
-                                    <div>
-                                        <h4>Delivery #{d.id}</h4>
-                                        <p>For Order #{d.order}</p>
-                                    </div>
-                                </div>
-
-                                <div className="order-card-bottom">
-                                    <span>Current Status</span>
-                                    <span
-                                        className={`badge badge-${d.status === "DELIVERED"
-                                                ? "delivered"
-                                                : d.status === "IN_TRANSIT"
-                                                    ? "accepted"
-                                                    : "pending"
-                                            }`}
-                                    >
-                                        {d.status}
-                                    </span>
-                                </div>
-
-                                <div className="delivery-actions">
-                                    {d.status === "ASSIGNED" && (
-                                        <button
-                                            className="btn-primary"
-                                            onClick={() =>
-                                                handleUpdateDeliveryStatus(d.id, "IN_TRANSIT")
-                                            }
-                                        >
-                                            Mark In Transit
-                                        </button>
-                                    )}
-
-                                    {d.status === "IN_TRANSIT" && (
-                                        <button
-                                            className="btn-primary"
-                                            onClick={() =>
-                                                handleUpdateDeliveryStatus(d.id, "DELIVERED")
-                                            }
-                                        >
-                                            Mark Delivered
-                                        </button>
-                                    )}
-                                </div>
+                <div className="grid-list">
+                    {active.map(d => (
+                        <div key={d.id} className="card-item status-card">
+                            <div className="card-header">
+                                <h3>Delivery #{d.id}</h3>
+                                <span className={`status-badge ${d.status.toLowerCase()}`}>{d.status}</span>
                             </div>
-                        ))}
-                    </div>
-                )}
+                            <div className="progress-track">
+                                <div className={`dot ${d.status === 'ASSIGNED' || d.status === 'IN_TRANSIT' ? 'active' : ''}`}></div>
+                                <div className={`line ${d.status === 'IN_TRANSIT' ? 'active' : ''}`}></div>
+                                <div className={`dot ${d.status === 'IN_TRANSIT' ? 'active' : ''}`}></div>
+                                <div className={`line`}></div>
+                                <div className={`dot`}></div>
+                            </div>
+                            <div className="action-row">
+                                {d.status === 'ASSIGNED' ? (
+                                    <button className="btn-secondary" onClick={() => handleUpdateStatus(d.id, 'IN_TRANSIT')}>
+                                        Start Transit
+                                    </button>
+                                ) : (
+                                    <button className="btn-success" onClick={() => handleUpdateStatus(d.id, 'DELIVERED')}>
+                                        Mark as Delivered
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                    {active.length === 0 && <p className="empty-state">No active deliveries to update.</p>}
+                </div>
             </div>
         );
     }
 
-    if (activeTab === "services") {
+    if (activeTab === "history") {
+        const history = myDeliveries.filter(d => d.status === 'DELIVERED');
         return (
             <div className="glass-panel">
                 <div className="section-header">
-                    <h3>Services</h3>
-                    <p>Transporter services will appear here</p>
+                    <h2>Delivery History</h2>
+                    <p>Your completed missions</p>
                 </div>
-                <p className="empty-state">Services section coming soon.</p>
+                <div className="history-table-container">
+                    <table className="history-table">
+                        <thead>
+                            <tr>
+                                <th>Delivery ID</th>
+                                <th>Order</th>
+                                <th>Date</th>
+                                <th>Fee</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {history.map(d => (
+                                <tr key={d.id}>
+                                    <td>#{d.id}</td>
+                                    <td>Order #{d.order}</td>
+                                    <td>{new Date(d.delivery_date).toLocaleDateString()}</td>
+                                    <td className="earning-text">${d.delivery_fee}</td>
+                                    <td><span className="badge-success">Completed</span></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {history.length === 0 && <p className="empty-state">No history found.</p>}
+                </div>
+            </div>
+        );
+    }
+
+    if (activeTab === "earnings") {
+        return (
+            <div className="earnings-view">
+                <div className="earnings-summary glass-panel">
+                    <div className="summary-card">
+                        <DollarSign size={32} className="icon-gold" />
+                        <div>
+                            <span>Total Earnings</span>
+                            <h2>${earningsData.total_earnings}</h2>
+                        </div>
+                    </div>
+                    <div className="summary-card">
+                        <CheckCircle size={32} className="icon-green" />
+                        <div>
+                            <span>Missions Completed</span>
+                            <h2>{earningsData.completed_count}</h2>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="glass-panel mt-1">
+                    <h3>Recent Payouts</h3>
+                    <div className="mini-list">
+                        {earningsData.history?.map(d => (
+                            <div key={d.id} className="mini-item">
+                                <span>Delivery #{d.id}</span>
+                                <strong className="green-text">+${d.delivery_fee}</strong>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (activeTab === "profile") {
+        return (
+            <div className="glass-panel max-600">
+                <div className="section-header">
+                    <h2>Vehicle Profile</h2>
+                    <p>Manage your transport capabilities</p>
+                </div>
+                <form className="profile-form" onSubmit={handleProfileUpdate}>
+                    <div className="form-group">
+                        <label>Vehicle Type</label>
+                        <input
+                            type="text"
+                            value={profileForm.vehicle_type}
+                            onChange={(e) => setProfileForm({ ...profileForm, vehicle_type: e.target.value })}
+                            placeholder="e.g. Refrigerated Truck"
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>License Plate</label>
+                        <input
+                            type="text"
+                            value={profileForm.license_plate}
+                            onChange={(e) => setProfileForm({ ...profileForm, license_plate: e.target.value })}
+                            placeholder="e.g. ABC-1234"
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Capacity (Tons)</label>
+                        <input
+                            type="number"
+                            step="0.1"
+                            value={profileForm.capacity}
+                            onChange={(e) => setProfileForm({ ...profileForm, capacity: parseFloat(e.target.value) })}
+                        />
+                    </div>
+                    <button type="submit" className="btn-primary" disabled={loading}>
+                        {loading ? "Saving..." : <><Save size={18} /> Update Profile</>}
+                    </button>
+                </form>
             </div>
         );
     }
