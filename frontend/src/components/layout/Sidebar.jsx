@@ -34,6 +34,7 @@ const Sidebar = ({ user, activeTab, setActiveTab, logoutUser }) => {
     { key: "dashboard", label: "Overview", icon: <Home size={18} /> },
     { key: "users", label: "Users Management", icon: <Users size={18} /> },
     { key: "complaints", label: "Complaints", icon: <AlertCircle size={18} /> },
+    { key: "catalog", label: "Manage Catalog", icon: <Package size={18} /> },
     { key: "notifications", label: "Farmer Alerts", icon: <Bell size={18} /> },
   ];
 

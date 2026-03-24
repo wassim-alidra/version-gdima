@@ -2,11 +2,13 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     ProductViewSet, OrderViewSet, DeliveryViewSet, 
-    ComplaintViewSet, NotificationViewSet, AdminStatsView, UserListViewSet
+    ComplaintViewSet, NotificationViewSet, AdminStatsView, UserListViewSet,
+    ProductCatalogViewSet
 )
 
 router = DefaultRouter()
 router.register(r'products', ProductViewSet, basename='product')
+router.register(r'catalog', ProductCatalogViewSet, basename='catalog')
 router.register(r'orders', OrderViewSet)
 router.register(r'deliveries', DeliveryViewSet)
 router.register(r'complaints', ComplaintViewSet)

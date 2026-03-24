@@ -1,13 +1,23 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Product, Order, Delivery, Complaint, Notification
+from .models import Product, Order, Delivery, Complaint, Notification, ProductCatalog
 from .serializers import (
     ProductSerializer, OrderSerializer, DeliverySerializer, 
-    ComplaintSerializer, NotificationSerializer
+    ComplaintSerializer, NotificationSerializer, ProductCatalogSerializer
 )
 from users.models import User
 from django.db.models import Sum
+
+class ProductCatalogViewSet(viewsets.ModelViewSet):
+    queryset = ProductCatalog.objects.all()
+    serializer_class = ProductCatalogSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [permissions.IsAdminUser()]
+        return super().get_permissions()
 
 class ProductViewSet(viewsets.ModelViewSet):
     serializer_class = ProductSerializer
@@ -15,17 +25,18 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = Product.objects.all()
-        
+
         if user.role == User.Role.FARMER:
-            queryset = queryset.filter(farmer=user)
-            
-        # Filtering for Buyer/All
+            # Farmers see all their own products (even legacy ones)
+            queryset = Product.objects.filter(farmer=user)
+        else:
+            # Buyers and others only see properly catalogued products
+            queryset = Product.objects.filter(catalog__isnull=False)
+
         search = self.request.query_params.get('search')
-        
         if search:
-            queryset = queryset.filter(name__icontains=search)
-            
+            queryset = queryset.filter(catalog__name__icontains=search)
+
         return queryset
 
     def perform_create(self, serializer):

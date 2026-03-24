@@ -27,7 +27,7 @@ const BuyerDashboard = ({ activeTab }) => {
     }, [activeTab]);
 
     useEffect(() => {
-        if (activeTab === "products") fetchProducts();
+        if (activeTab === "products" || activeTab === "dashboard") fetchProducts();
     }, [activeTab, filters]);
 
 
@@ -201,9 +201,9 @@ const BuyerDashboard = ({ activeTab }) => {
                         <div className="grid-list-mini">
                             {products.slice(0, 4).map(p => (
                                 <div key={p.id} className="mini-item-card">
-                                    <div className="item-img">{p.name[0]}</div>
+                                    <div className="item-img">{p.name?.[0] || 'P'}</div>
                                     <div className="item-details">
-                                        <strong>{p.name}</strong>
+                                        <strong>{p.name || "Unnamed Product"}</strong>
                                         <span>{p.price_per_kg} DA/kg</span>
                                     </div>
                                     <button className="btn-icon" onClick={() => addToCart(p)}>+</button>
@@ -255,9 +255,9 @@ const BuyerDashboard = ({ activeTab }) => {
                 <div className="product-marketplace-grid mt-2">
                     {products.map(p => (
                         <div key={p.id} className="product-card-premium">
-                            <div className="product-icon-box">{p.name[0]}</div>
+                            <div className="product-icon-box">{p.name?.[0] || 'P'}</div>
                             <div className="product-info">
-                                <h3>{p.name}</h3>
+                                <h3>{p.name || "Unnamed Product"}</h3>
                                 <p className="farmer-name">By {p.farmer_name}</p>
                                 <div className="price-tag">{p.price_per_kg} DA/kg</div>
                                 <p className="stock-info">{p.quantity_available}kg available</p>
@@ -282,9 +282,9 @@ const BuyerDashboard = ({ activeTab }) => {
                 {cart ? (
                     <div className="cart-checkout-card">
                         <div className="cart-item-info">
-                            <div className="item-icon-lg">{cart.name[0]}</div>
+                            <div className="item-icon-lg">{cart.name?.[0] || 'P'}</div>
                             <div className="item-text">
-                                <h3>{cart.name}</h3>
+                                <h3>{cart.name || "Unnamed Product"}</h3>
                                 <p>From: {cart.farmer_name}</p>
                                 <div className="checkout-badge">{cart.quantity}kg</div>
                             </div>

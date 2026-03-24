@@ -1,13 +1,24 @@
 from rest_framework import serializers
-from .models import Product, Order, Delivery, Complaint, Notification
+from .models import Product, Order, Delivery, Complaint, Notification, ProductCatalog
+
+class ProductCatalogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductCatalog
+        fields = '__all__'
 
 class ProductSerializer(serializers.ModelSerializer):
     farmer_name = serializers.CharField(source='farmer.username', read_only=True)
+    name = serializers.ReadOnlyField()
+    description = serializers.ReadOnlyField()
+    catalog_name = serializers.SerializerMethodField()
     
     class Meta:
         model = Product
         fields = '__all__'
         read_only_fields = ('farmer',)
+
+    def get_catalog_name(self, obj):
+        return obj.catalog.name if obj.catalog else "Uncategorized"
 
 class OrderSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)

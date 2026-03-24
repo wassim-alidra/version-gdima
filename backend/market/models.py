@@ -3,17 +3,32 @@ from django.conf import settings
 from users.models import User
 from decimal import Decimal
 
+class ProductCatalog(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
 class Product(models.Model):
     farmer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='products', limit_choices_to={'role': User.Role.FARMER})
-    name = models.CharField(max_length=255)
-    description = models.TextField()
+    catalog = models.ForeignKey(ProductCatalog, on_delete=models.CASCADE, related_name='instances', null=True, blank=True)
     price_per_kg = models.DecimalField(max_digits=10, decimal_places=2)
     quantity_available = models.FloatField(help_text="Quantity in kg")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def name(self):
+        return self.catalog.name if self.catalog else "Unnamed Product"
+
+    @property
+    def description(self):
+        return self.catalog.description if self.catalog else "No description available"
+
     def __str__(self):
-        return self.name
+        return f"{self.farmer.username}'s {self.catalog.name}"
 
 class Order(models.Model):
     class Status(models.TextChoices):

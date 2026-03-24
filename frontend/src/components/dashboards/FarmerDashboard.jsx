@@ -7,6 +7,7 @@ const FarmerDashboard = ({ activeTab }) => {
     const [products, setProducts] = useState([]);
     const [orders, setOrders] = useState([]);
     const [notifications, setNotifications] = useState([]);
+    const [catalog, setCatalog] = useState([]);
     const [stats, setStats] = useState({
         total_products: 0,
         total_quantity: 0,
@@ -16,8 +17,7 @@ const FarmerDashboard = ({ activeTab }) => {
         total_revenue: 0
     });
     const [formData, setFormData] = useState({
-        name: "",
-        description: "",
+        catalog: "",
         price_per_kg: "",
         quantity_available: "",
     });
@@ -28,7 +28,17 @@ const FarmerDashboard = ({ activeTab }) => {
         fetchOrders();
         fetchStats();
         fetchNotifications();
+        fetchCatalog();
     }, [activeTab]);
+
+    const fetchCatalog = async () => {
+        try {
+            const res = await api.get("market/catalog/");
+            setCatalog(res.data);
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     const fetchProducts = async () => {
         try {
@@ -68,33 +78,25 @@ const FarmerDashboard = ({ activeTab }) => {
         e.preventDefault();
         setLoading(true);
 
-        if (!formData.name || !formData.price_per_kg || !formData.quantity_available || !formData.description) {
-            alert("Please fill all fields, including description.");
+        if (!formData.catalog || !formData.price_per_kg || !formData.quantity_available) {
+            alert("Please select a product type and fill all fields.");
             setLoading(false);
             return;
         }
 
         try {
-            await api.post("market/products/", {
-                name: formData.name,
-                description: formData.description,
-                price_per_kg: parseFloat(formData.price_per_kg),
-                quantity_available: parseFloat(formData.quantity_available),
-            });
-
+            await api.post("market/products/", formData);
+            alert("Product added to your inventory!");
             setFormData({
-                name: "",
-                description: "",
+                catalog: "",
                 price_per_kg: "",
                 quantity_available: "",
             });
-
             fetchProducts();
             fetchStats();
-            alert("Product added successfully.");
         } catch (err) {
             console.error("Error adding product:", err);
-            alert("Failed to add product: " + (err.response?.data?.description || "Unknown error"));
+            alert("Error adding product. Please ensure all fields are correct.");
         } finally {
             setLoading(false);
         }
@@ -188,11 +190,15 @@ const FarmerDashboard = ({ activeTab }) => {
                             <Plus size={20} color="#6b7280" />
                         </div>
                         <form className="mini-form" onSubmit={handleAddProduct}>
-                            <input name="name" value={formData.name} onChange={handleChange} placeholder="Product Name" />
-                            <textarea name="description" value={formData.description} onChange={handleChange} placeholder="Describe your product..." rows="2" />
+                            <select name="catalog" value={formData.catalog} onChange={handleChange} required>
+                                <option value="">Select Product Type</option>
+                                {catalog.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
                             <div className="form-row">
-                                <input type="number" name="price_per_kg" value={formData.price_per_kg} onChange={handleChange} placeholder="Price /kg" />
-                                <input type="number" name="quantity_available" value={formData.quantity_available} onChange={handleChange} placeholder="Qty kg" />
+                                <input type="number" name="price_per_kg" value={formData.price_per_kg} onChange={handleChange} placeholder="Price /kg" required />
+                                <input type="number" name="quantity_available" value={formData.quantity_available} onChange={handleChange} placeholder="Qty kg" required />
                             </div>
                             <button type="submit" className="btn-primary" disabled={loading}>{loading ? "Adding..." : "Add Product"}</button>
                         </form>
@@ -207,7 +213,7 @@ const FarmerDashboard = ({ activeTab }) => {
                             {orders.filter(o => o.status === 'PENDING').slice(0, 3).map(o => (
                                 <div key={o.id} className="mini-item">
                                     <div className="item-main">
-                                        <strong>{o.product_name}</strong>
+                                        <strong>{o.product_name || "Product"}</strong>
                                         <span>{o.quantity}kg • {o.total_price} DA</span>
                                     </div>
                                     <div className="flex-gap-sm">
@@ -235,20 +241,21 @@ const FarmerDashboard = ({ activeTab }) => {
                 <form className="expanded-form" onSubmit={handleAddProduct}>
                     <div className="grid-form">
                         <div className="form-group span-2">
-                            <label>Product Name</label>
-                            <input name="name" value={formData.name} onChange={handleChange} placeholder="e.g. Fresh Red Tomatoes" />
-                        </div>
-                        <div className="form-group span-2">
-                            <label>Description</label>
-                            <textarea name="description" value={formData.description} onChange={handleChange} placeholder="Tell buyers about your harvest..." rows="3" />
+                            <label>Product Type (From Official List)</label>
+                            <select name="catalog" value={formData.catalog} onChange={handleChange} required>
+                                <option value="">-- Choose a product type --</option>
+                                {catalog.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
                         </div>
                         <div className="form-group">
                             <label>Price per Kg (DA)</label>
-                            <input type="number" name="price_per_kg" value={formData.price_per_kg} onChange={handleChange} placeholder="0.00" />
+                            <input type="number" name="price_per_kg" value={formData.price_per_kg} onChange={handleChange} placeholder="0.00" required />
                         </div>
                         <div className="form-group">
                             <label>Available Quantity (kg)</label>
-                            <input type="number" name="quantity_available" value={formData.quantity_available} onChange={handleChange} placeholder="0" />
+                            <input type="number" name="quantity_available" value={formData.quantity_available} onChange={handleChange} placeholder="0" required />
                         </div>
                     </div>
                     <button type="submit" className="btn-primary mt-1" disabled={loading}>{loading ? "Publishing..." : "Add Product to Market"}</button>
@@ -260,8 +267,8 @@ const FarmerDashboard = ({ activeTab }) => {
                         {products.map(p => (
                             <div key={p.id} className="card-item animate-in">
                                 <div className="card-content">
-                                    <h3>{p.name}</h3>
-                                    <p className="p-desc">{p.description}</p>
+                                    <h3>{p.name || "Unnamed Product"}</h3>
+                                    <p className="p-desc">{p.description || "No description available"}</p>
                                     <div className="product-meta">
                                         <strong>{p.price_per_kg} DA/kg</strong>
                                         <span>{p.quantity_available}kg left</span>

@@ -7,13 +7,16 @@ const AdminDashboard = ({ activeTab }) => {
     const [stats, setStats] = useState(null);
     const [users, setUsers] = useState([]);
     const [complaints, setComplaints] = useState([]);
+    const [catalog, setCatalog] = useState([]);
     const [notifMessage, setNotifMessage] = useState("");
+    const [catalogForm, setCatalogForm] = useState({ name: "", description: "" });
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (activeTab === "dashboard") fetchStats();
         if (activeTab === "users") fetchUsers();
         if (activeTab === "complaints") fetchComplaints();
+        if (activeTab === "catalog") fetchCatalog();
     }, [activeTab]);
 
     const fetchStats = async () => {
@@ -56,6 +59,40 @@ const AdminDashboard = ({ activeTab }) => {
             alert(msg);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchCatalog = async () => {
+        try {
+            const res = await api.get("market/catalog/");
+            setCatalog(res.data);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleAddCatalogItem = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            await api.post("market/catalog/", catalogForm);
+            alert("Added to catalog!");
+            setCatalogForm({ name: "", description: "" });
+            fetchCatalog();
+        } catch (err) {
+            alert("Error adding to catalog");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteCatalogItem = async (id) => {
+        if (!window.confirm("Remove this product from the official list?")) return;
+        try {
+            await api.delete(`market/catalog/${id}/`);
+            fetchCatalog();
+        } catch (err) {
+            alert("Error removing item");
         }
     };
 
@@ -168,6 +205,59 @@ const AdminDashboard = ({ activeTab }) => {
                         </div>
                     ))}
                     {complaints.length === 0 && <p className="empty-text">No complaints found.</p>}
+                </div>
+            </div>
+        );
+    }
+
+    if (activeTab === "catalog") {
+        return (
+            <div className="glass-panel animate-in">
+                <div className="section-header">
+                    <h2>Official Product Catalog</h2>
+                    <p>Manage the list of products farmers are allowed to sell</p>
+                </div>
+
+                <form className="expanded-form mb-2" onSubmit={handleAddCatalogItem}>
+                    <div className="grid-form">
+                        <div className="form-group span-2">
+                            <label>Product Type Name</label>
+                            <input 
+                                value={catalogForm.name} 
+                                onChange={(e) => setCatalogForm({...catalogForm, name: e.target.value})}
+                                placeholder="e.g. Red Sweet Tomatoes" 
+                                required
+                            />
+                        </div>
+                        <div className="form-group span-2">
+                            <label>Official Description (Global)</label>
+                            <textarea 
+                                value={catalogForm.description}
+                                onChange={(e) => setCatalogForm({...catalogForm, description: e.target.value})}
+                                placeholder="General description for this product type..." 
+                                rows="2"
+                            />
+                        </div>
+                    </div>
+                    <button type="submit" className="btn-primary mt-1" disabled={loading}>
+                        {loading ? "Adding..." : "Add to Official List"}
+                    </button>
+                </form>
+
+                <div className="inventory-list mt-2">
+                    <h3>Defined Products</h3>
+                    <div className="grid-list">
+                        {catalog.map(item => (
+                            <div key={item.id} className="card-item animate-in">
+                                <div className="card-content">
+                                    <h3>{item.name}</h3>
+                                    <p className="p-desc">{item.description}</p>
+                                </div>
+                                <button className="btn-danger-outline full-width" onClick={() => handleDeleteCatalogItem(item.id)}>Remove from Catalog</button>
+                            </div>
+                        ))}
+                        {catalog.length === 0 && <p className="empty-text">Catalog is empty.</p>}
+                    </div>
                 </div>
             </div>
         );
