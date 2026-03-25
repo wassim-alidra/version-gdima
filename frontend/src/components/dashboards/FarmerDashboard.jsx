@@ -21,6 +21,7 @@ const FarmerDashboard = ({ activeTab }) => {
         price_per_kg: "",
         quantity_available: "",
     });
+    const [selectedCatalogItem, setSelectedCatalogItem] = useState(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -68,10 +69,12 @@ const FarmerDashboard = ({ activeTab }) => {
     };
 
     const handleChange = (e) => {
-        setFormData((prev) => ({
-            ...prev,
-            [e.target.name]: e.target.value,
-        }));
+        const { name, value } = e.target;
+        setFormData((prev) => ({ ...prev, [name]: value }));
+        if (name === "catalog") {
+            const found = catalog.find(c => String(c.id) === String(value));
+            setSelectedCatalogItem(found || null);
+        }
     };
 
     const handleAddProduct = async (e) => {
@@ -197,7 +200,21 @@ const FarmerDashboard = ({ activeTab }) => {
                                 ))}
                             </select>
                             <div className="form-row">
-                                <input type="number" name="price_per_kg" value={formData.price_per_kg} onChange={handleChange} placeholder="Price /kg" required />
+                                <div style={{display:'flex', flexDirection:'column', gap:'4px'}}>
+                                    <input
+                                        type="number" name="price_per_kg"
+                                        value={formData.price_per_kg} onChange={handleChange}
+                                        placeholder="Price /kg"
+                                        min={selectedCatalogItem?.min_price ?? undefined}
+                                        max={selectedCatalogItem?.max_price ?? undefined}
+                                        required
+                                    />
+                                    {selectedCatalogItem?.min_price && selectedCatalogItem?.max_price && (
+                                        <small style={{color:'#6b7280', fontSize:'0.75rem'}}>
+                                            Allowed: {selectedCatalogItem.min_price} – {selectedCatalogItem.max_price} DA/kg
+                                        </small>
+                                    )}
+                                </div>
                                 <input type="number" name="quantity_available" value={formData.quantity_available} onChange={handleChange} placeholder="Qty kg" required />
                             </div>
                             <button type="submit" className="btn-primary" disabled={loading}>{loading ? "Adding..." : "Add Product"}</button>
@@ -251,7 +268,18 @@ const FarmerDashboard = ({ activeTab }) => {
                         </div>
                         <div className="form-group">
                             <label>Price per Kg (DA)</label>
-                            <input type="number" name="price_per_kg" value={formData.price_per_kg} onChange={handleChange} placeholder="0.00" required />
+                            <input
+                                type="number" name="price_per_kg"
+                                value={formData.price_per_kg} onChange={handleChange}
+                                placeholder="0.00" required
+                                min={selectedCatalogItem?.min_price ?? undefined}
+                                max={selectedCatalogItem?.max_price ?? undefined}
+                            />
+                            {selectedCatalogItem?.min_price && selectedCatalogItem?.max_price && (
+                                <small className="price-hint">
+                                    💰 Allowed range: <strong>{selectedCatalogItem.min_price}</strong> to <strong>{selectedCatalogItem.max_price}</strong> DA/kg
+                                </small>
+                            )}
                         </div>
                         <div className="form-group">
                             <label>Available Quantity (kg)</label>
@@ -377,38 +405,35 @@ const FarmerDashboard = ({ activeTab }) => {
             <div className="glass-panel animate-in">
                 <div className="section-header">
                     <h2><FileText size={24} /> Official Market Prices</h2>
-                    <p>Reference prices set by the Ministry of Agriculture</p>
+                    <p>Price ranges set by the Ministry of Agriculture</p>
                 </div>
-                <div className="price-list-placeholder">
+                {catalog.length === 0 ? (
                     <p className="notice-box">
                         <AlertCircle size={20} />
-                        Official price lists will be updated once the Ministry administrator publishes them.
+                        No official price ranges have been published yet by the Ministry.
                     </p>
+                ) : (
                     <table className="price-table">
                         <thead>
                             <tr>
-                                <th>Category</th>
-                                <th>Average Price</th>
-                                <th>Max Allowed</th>
-                                <th>Trend</th>
+                                <th>Product</th>
+                                <th>Description</th>
+                                <th>Min Price (DA/kg)</th>
+                                <th>Max Price (DA/kg)</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>Vegetables</td>
-                                <td>-- DA/kg</td>
-                                <td>-- DA/kg</td>
-                                <td>Stable</td>
-                            </tr>
-                            <tr>
-                                <td>Fruits</td>
-                                <td>-- DA/kg</td>
-                                <td>-- DA/kg</td>
-                                <td>Rising</td>
-                            </tr>
+                            {catalog.map(c => (
+                                <tr key={c.id}>
+                                    <td><strong>{c.name}</strong></td>
+                                    <td>{c.description || "—"}</td>
+                                    <td style={{color:'#059669', fontWeight:600}}>{c.min_price ?? "—"}</td>
+                                    <td style={{color:'#dc2626', fontWeight:600}}>{c.max_price ?? "—"}</td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
-                </div>
+                )}
             </div>
         );
     }

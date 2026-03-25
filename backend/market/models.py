@@ -6,6 +6,8 @@ from decimal import Decimal
 class ProductCatalog(models.Model):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True)
+    min_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Minimum price per kg (DA)")
+    max_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Maximum price per kg (DA)")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

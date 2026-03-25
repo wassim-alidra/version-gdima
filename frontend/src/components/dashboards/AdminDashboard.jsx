@@ -9,7 +9,8 @@ const AdminDashboard = ({ activeTab }) => {
     const [complaints, setComplaints] = useState([]);
     const [catalog, setCatalog] = useState([]);
     const [notifMessage, setNotifMessage] = useState("");
-    const [catalogForm, setCatalogForm] = useState({ name: "", description: "" });
+    const [notifTarget, setNotifTarget] = useState("all");
+    const [catalogForm, setCatalogForm] = useState({ name: "", description: "", min_price: "", max_price: "" });
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -46,13 +47,15 @@ const AdminDashboard = ({ activeTab }) => {
         }
     };
 
+    const targetLabel = { farmers: "Farmers", buyers: "Buyers", all: "Farmers & Buyers" };
+
     const handleSendNotification = async (e) => {
         e.preventDefault();
         if (!notifMessage) return;
         setLoading(true);
         try {
-            await api.post("market/notifications/send_broadcast/", { message: notifMessage });
-            alert("Broadcast sent successfully to all Farmers and Buyers!");
+            await api.post("market/notifications/send_broadcast/", { message: notifMessage, target: notifTarget });
+            alert(`Broadcast sent successfully to all ${targetLabel[notifTarget]}!`);
             setNotifMessage("");
         } catch (err) {
             const msg = err.response?.data?.detail || err.response?.data?.message || "Error sending notification. Please try again.";
@@ -77,7 +80,7 @@ const AdminDashboard = ({ activeTab }) => {
         try {
             await api.post("market/catalog/", catalogForm);
             alert("Added to catalog!");
-            setCatalogForm({ name: "", description: "" });
+            setCatalogForm({ name: "", description: "", min_price: "", max_price: "" });
             fetchCatalog();
         } catch (err) {
             alert("Error adding to catalog");
@@ -238,6 +241,26 @@ const AdminDashboard = ({ activeTab }) => {
                                 rows="2"
                             />
                         </div>
+                        <div className="form-group">
+                            <label>Min Price (DA/kg)</label>
+                            <input
+                                type="number" min="0" step="0.01"
+                                value={catalogForm.min_price}
+                                onChange={(e) => setCatalogForm({...catalogForm, min_price: e.target.value})}
+                                placeholder="e.g. 50"
+                                required
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>Max Price (DA/kg)</label>
+                            <input
+                                type="number" min="0" step="0.01"
+                                value={catalogForm.max_price}
+                                onChange={(e) => setCatalogForm({...catalogForm, max_price: e.target.value})}
+                                placeholder="e.g. 200"
+                                required
+                            />
+                        </div>
                     </div>
                     <button type="submit" className="btn-primary mt-1" disabled={loading}>
                         {loading ? "Adding..." : "Add to Official List"}
@@ -252,6 +275,11 @@ const AdminDashboard = ({ activeTab }) => {
                                 <div className="card-content">
                                     <h3>{item.name}</h3>
                                     <p className="p-desc">{item.description}</p>
+                                    {(item.min_price || item.max_price) && (
+                                        <div className="price-range-badge">
+                                            <span>💰 {item.min_price ?? "--"} – {item.max_price ?? "--"} DA/kg</span>
+                                        </div>
+                                    )}
                                 </div>
                                 <button className="btn-danger-outline full-width" onClick={() => handleDeleteCatalogItem(item.id)}>Remove from Catalog</button>
                             </div>
@@ -267,14 +295,31 @@ const AdminDashboard = ({ activeTab }) => {
         return (
             <div className="glass-panel animate-in max-600">
                 <div className="section-header">
-                    <h2>Broadcast Farmer Alerts</h2>
-                    <p>Send official notifications to all registered farmers</p>
+                    <h2>Send Official Broadcast</h2>
+                    <p>Choose the audience and compose your ministerial notification</p>
                 </div>
                 <form className="admin-form" onSubmit={handleSendNotification}>
                     <div className="form-group">
+                        <label>Send To</label>
+                        <div className="notif-target-group">
+                            {["all", "farmers", "buyers"].map(opt => (
+                                <label key={opt} className={`notif-target-btn ${notifTarget === opt ? "active" : ""}`}>
+                                    <input
+                                        type="radio"
+                                        name="notifTarget"
+                                        value={opt}
+                                        checked={notifTarget === opt}
+                                        onChange={() => setNotifTarget(opt)}
+                                    />
+                                    {opt === "all" ? "🌾 Farmers & 🛒 Buyers" : opt === "farmers" ? "🌾 Farmers Only" : "🛒 Buyers Only"}
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="form-group">
                         <label>Minister Message</label>
-                        <textarea 
-                            rows="5" 
+                        <textarea
+                            rows="5"
                             placeholder="Type your official announcement here..."
                             value={notifMessage}
                             onChange={(e) => setNotifMessage(e.target.value)}
@@ -282,7 +327,7 @@ const AdminDashboard = ({ activeTab }) => {
                         ></textarea>
                     </div>
                     <button type="submit" className="btn-primary-lg" disabled={loading}>
-                        {loading ? "Sending..." : "Send Broadcast to Farmers"}
+                        {loading ? "Sending..." : `Send to ${targetLabel[notifTarget]}`}
                     </button>
                 </form>
             </div>

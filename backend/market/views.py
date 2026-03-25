@@ -1,6 +1,7 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.serializers import ValidationError
 from .models import Product, Order, Delivery, Complaint, Notification, ProductCatalog
 from .serializers import (
     ProductSerializer, OrderSerializer, DeliverySerializer, 
@@ -39,14 +40,29 @@ class ProductViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    def _validate_price(self, serializer):
+        catalog = serializer.validated_data.get('catalog')
+        price = serializer.validated_data.get('price_per_kg')
+        if catalog and price is not None:
+            if catalog.min_price is not None and price < catalog.min_price:
+                raise ValidationError(
+                    {"price_per_kg": f"Price too low. Minimum allowed for '{catalog.name}' is {catalog.min_price} DA/kg."}
+                )
+            if catalog.max_price is not None and price > catalog.max_price:
+                raise ValidationError(
+                    {"price_per_kg": f"Price too high. Maximum allowed for '{catalog.name}' is {catalog.max_price} DA/kg."}
+                )
+
     def perform_create(self, serializer):
         if self.request.user.role != User.Role.FARMER:
              raise permissions.PermissionDenied("Only farmers can add products.")
+        self._validate_price(serializer)
         serializer.save(farmer=self.request.user)
 
     def perform_update(self, serializer):
         if self.get_object().farmer != self.request.user:
             raise permissions.PermissionDenied("You can only edit your own products.")
+        self._validate_price(serializer)
         serializer.save()
 
     def perform_destroy(self, instance):
@@ -214,7 +230,7 @@ class ComplaintViewSet(viewsets.ModelViewSet):
         try:
             serializer.save(user=self.request.user)
         except Exception as e:
-            raise serializers.ValidationError({"detail": str(e)})
+            raise ValidationError({"detail": str(e)})
 
 class NotificationViewSet(viewsets.ModelViewSet):
     queryset = Notification.objects.all()
@@ -233,9 +249,16 @@ class NotificationViewSet(viewsets.ModelViewSet):
         if not message:
             return Response({"detail": "Message is required."}, status=status.HTTP_400_BAD_REQUEST)
         
+        target = request.data.get('target', 'all')  # 'farmers', 'buyers', or 'all'
+        if target == 'farmers':
+            roles = [User.Role.FARMER]
+        elif target == 'buyers':
+            roles = [User.Role.BUYER]
+        else:
+            roles = [User.Role.FARMER, User.Role.BUYER]
+
         try:
-            # Send to Farmers and Buyers
-            recipients = User.objects.filter(role__in=[User.Role.FARMER, User.Role.BUYER])
+            recipients = User.objects.filter(role__in=roles)
             notifications = [Notification(recipient=r, message=message) for r in recipients]
             Notification.objects.bulk_create(notifications)
             return Response({"detail": f"Notification sent to {len(notifications)} users."}, status=status.HTTP_201_CREATED)
